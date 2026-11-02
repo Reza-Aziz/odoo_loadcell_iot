@@ -16,6 +16,9 @@ class StockPicking(models.Model):
         compute='_compute_iot_latest', help="Pembacaan terakhir dari MQTT")
     iot_latest_time = fields.Datetime(
         string="Waktu Timbangan", compute='_compute_iot_latest')
+    is_iot_verified = fields.Boolean(
+        string="Terverifikasi IoT", tracking=True,
+        help="True kalau berat IoT sudah dipindah ke quantity lewat tombol.")
 
     @api.depends()
     def _compute_iot_latest(self):
@@ -35,7 +38,7 @@ class StockPicking(models.Model):
                         "Berat terbaca %s kg, harus > 0. Kalibrasi/tare timbangan dulu."
                         % weight)
                 raise UserError(
-                    "Belum ada data timbangan. Pastikan subscriber MQTT jalan dan "
+                    "Belum ada data timbangan. Pastikan mqtt_bridge.py jalan dan "
                     "sudah ada pesan di topic factory/plant_1/line_1/scale_weight.")
             # ponytail: asumsi 1 baris produk per receipt; perlu logika
             # pembagian kalau nanti receipt multi-produk.
@@ -43,5 +46,6 @@ class StockPicking(models.Model):
             if len(moves) != 1:
                 raise UserError("Isi berat IoT hanya untuk receipt dengan 1 baris produk.")
             picking.iot_net_weight = weight
+            picking.is_iot_verified = True
             moves.quantity = weight
         return True

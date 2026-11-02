@@ -1,4 +1,4 @@
-"""Subscriber MQTT -> simpan pembacaan timbangan ke Odoo lewat JSON-RPC."""
+"""Bridge MQTT -> Odoo: simpan pembacaan timbangan dan tulis ke receipt aktif."""
 
 import json
 import logging
@@ -21,14 +21,18 @@ ODOO_DB = os.environ.get("ODOO_DB", "odoo")
 ODOO_USER = os.environ.get("ODOO_USER", "admin")
 ODOO_PASSWORD = os.environ.get("ODOO_PASSWORD", "admin")
 
+# Receipt yang boleh ditimpa beratnya otomatis.
+OPEN_STATES = ["confirmed", "waiting", "assigned"]
+
 uid = None
 
 
-def rpc(service, method, *args):
+def rpc(service, method, *args, **kwargs):
     body = json.dumps({
         "jsonrpc": "2.0",
         "method": "call",
-        "params": {"service": service, "method": method, "args": args},
+        "params": {"service": service, "method": method,
+                   "args": list(args), "kwargs": kwargs},
     }).encode()
     req = urllib.request.Request(
         f"{ODOO_URL}/jsonrpc", body, {"Content-Type": "application/json"})
@@ -77,18 +81,40 @@ def parse_kg(payload):
     return None
 
 
+def write_to_picking(user_id, weight):
+    """Tulis berat ke receipt aktif terbaru; verifikasi direset karena berat baru."""
+    ids = rpc("object", "execute_kw", ODOO_DB, user_id, ODOO_PASSWORD,
+              "stock.picking", "search",
+              [[("picking_type_code", "=", "incoming"), ("state", "in", OPEN_STATES)]],
+              limit=1, order="id desc")
+    if not ids:
+        return None
+    rpc("object", "execute_kw", ODOO_DB, user_id, ODOO_PASSWORD,
+        "stock.picking", "write",
+        [ids, {"iot_net_weight": weight, "is_iot_verified": False}])
+    return ids[0]
+
+
 def on_message(client, userdata, msg):
     kg = parse_kg(msg.payload)
     if kg is None:
         print(f"payload tidak dikenali, dilewati: {msg.payload!r}", flush=True)
         return
     weight = round(kg - MQTT_TARE_GRAM / 1000, 3)
+    user_id = odoo_uid()
     try:
-        rpc("object", "execute_kw", ODOO_DB, odoo_uid(), ODOO_PASSWORD,
+        rpc("object", "execute_kw", ODOO_DB, user_id, ODOO_PASSWORD,
             "iot.scale.reading", "create", [{"topic": msg.topic, "weight": weight}])
-        print(f"{msg.topic} -> {weight} kg tersimpan", flush=True)
     except Exception as exc:  # noqa: BLE001 - jangan sampai subscriber mati
-        print(f"gagal simpan ke Odoo: {exc}", flush=True)
+        print(f"gagal simpan reading: {exc}", flush=True)
+        return
+    try:
+        picking_id = write_to_picking(user_id, weight)
+    except Exception as exc:  # noqa: BLE001
+        print(f"gagal tulis ke receipt: {exc}", flush=True)
+        return
+    target = f"receipt #{picking_id}" if picking_id else "tidak ada receipt aktif"
+    print(f"{msg.topic} -> {weight} kg -> {target}", flush=True)
 
 
 def main():
