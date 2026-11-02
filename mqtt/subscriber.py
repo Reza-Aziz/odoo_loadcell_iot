@@ -1,16 +1,20 @@
 """Subscriber MQTT -> simpan pembacaan timbangan ke Odoo lewat JSON-RPC."""
 
 import json
+import logging
 import os
 import sys
 import urllib.request
 
 import paho.mqtt.client as mqtt
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s: %(message)s")
+
 MQTT_HOST = os.environ.get("MQTT_HOST", "")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
 MQTT_TLS = os.environ.get("MQTT_TLS", "true").lower() == "true"
 MQTT_TOPIC = os.environ.get("MQTT_TOPIC", "factory/plant_1/line_1/scale_weight")
+MQTT_TARE_GRAM = float(os.environ.get("MQTT_TARE_GRAM") or 0)
 
 ODOO_URL = os.environ.get("ODOO_URL", "http://odoo:8069")
 ODOO_DB = os.environ.get("ODOO_DB", "odoo")
@@ -52,12 +56,33 @@ def on_connect(client, userdata, flags, reason_code, properties):
     print(f"subscribe {MQTT_TOPIC} @ {MQTT_HOST}:{MQTT_PORT}", flush=True)
 
 
-def on_message(client, userdata, msg):
+def parse_kg(payload):
+    """Berat dalam kg dari payload device."""
+    text = payload.decode(errors="replace").strip()
     try:
-        weight = float(msg.payload.decode().strip())
+        return float(text)  # angka mentah dianggap kilogram
     except ValueError:
-        print(f"payload bukan angka, dilewati: {msg.payload!r}", flush=True)
+        pass
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    if "weight_gram" in data:
+        return float(data["weight_gram"]) / 1000
+    if "weight" in data:
+        value = float(data["weight"])
+        return value / 1000 if str(data.get("unit", "kg")).lower() in ("g", "gram") else value
+    return None
+
+
+def on_message(client, userdata, msg):
+    kg = parse_kg(msg.payload)
+    if kg is None:
+        print(f"payload tidak dikenali, dilewati: {msg.payload!r}", flush=True)
         return
+    weight = round(kg - MQTT_TARE_GRAM / 1000, 3)
     try:
         rpc("object", "execute_kw", ODOO_DB, odoo_uid(), ODOO_PASSWORD,
             "iot.scale.reading", "create", [{"topic": msg.topic, "weight": weight}])

@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -7,10 +7,22 @@ class StockPicking(models.Model):
 
     iot_net_weight = fields.Float(
         string="Berat Aktual IoT (kg)",
-        digits=(16, 2),
+        digits=(16, 3),
         help="Data berat aktual dari simulasi Wokwi/IoT Scale",
         tracking=True,
     )
+    iot_latest_weight = fields.Float(
+        string="Timbangan Terakhir (kg)", digits=(16, 3),
+        compute='_compute_iot_latest', help="Pembacaan terakhir dari MQTT")
+    iot_latest_time = fields.Datetime(
+        string="Waktu Timbangan", compute='_compute_iot_latest')
+
+    @api.depends()
+    def _compute_iot_latest(self):
+        reading = self.env['iot.scale.reading'].search([], limit=1)
+        for picking in self:
+            picking.iot_latest_weight = reading.weight
+            picking.iot_latest_time = reading.received_at
 
     def action_get_iot_weight(self):
         """Ambil pembacaan timbangan terakhir (dari MQTT) dan isi quantity move."""
@@ -18,10 +30,13 @@ class StockPicking(models.Model):
         for picking in self:
             weight = reading.weight if reading else picking.iot_net_weight
             if weight <= 0:
+                if reading:
+                    raise UserError(
+                        "Berat terbaca %s kg, harus > 0. Kalibrasi/tare timbangan dulu."
+                        % weight)
                 raise UserError(
                     "Belum ada data timbangan. Pastikan subscriber MQTT jalan dan "
-                    "sudah ada pesan di topic factory/plant_1/line_1/scale_weight."
-                )
+                    "sudah ada pesan di topic factory/plant_1/line_1/scale_weight.")
             # ponytail: asumsi 1 baris produk per receipt; perlu logika
             # pembagian kalau nanti receipt multi-produk.
             moves = picking.move_ids

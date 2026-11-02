@@ -16,6 +16,8 @@
             <!-- Field berat IoT -->
             <xpath expr="//field[@name='origin']" position="after">
                 <field name="iot_net_weight"/>
+                <field name="iot_latest_weight" readonly="1"/>
+                <field name="iot_latest_time" readonly="1"/>
             </xpath>
         </field>
     </record>

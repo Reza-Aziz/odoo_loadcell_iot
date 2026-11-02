@@ -14,6 +14,8 @@
     'data': [
         'security/ir.access.csv',
         'views/stock_picking_views.xml',
+        'views/iot_dashboard_views.xml',
+        'views/iot_scale_reading_views.xml',
     ],
     'installable': True,
     'application': True,

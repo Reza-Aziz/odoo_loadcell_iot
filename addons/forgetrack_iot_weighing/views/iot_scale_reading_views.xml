@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_iot_scale_reading_list" model="ir.ui.view">
+        <field name="name">iot.scale.reading.list</field>
+        <field name="model">iot.scale.reading</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0">
+                <field name="received_at"/>
+                <field name="weight"/>
+                <field name="topic"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_iot_scale_reading" model="ir.actions.act_window">
+        <field name="name">IoT Scale Readings</field>
+        <field name="res_model">iot.scale.reading</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <menuitem id="menu_forgetrack_root"
+              name="ForgeTrack IoT"
+              web_icon="stock,static/description/icon.png"
+              sequence="60"/>
+
+    <menuitem id="menu_iot_scale_reading"
+              name="IoT Scale Readings"
+              parent="menu_forgetrack_root"
+              action="action_iot_scale_reading"
+              sequence="10"/>
+</odoo>

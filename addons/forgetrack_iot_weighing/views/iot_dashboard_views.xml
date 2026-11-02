@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Dashboard: akumulasi berat barang masuk dari penimbangan IoT -->
+    <record id="view_picking_iot_graph" model="ir.ui.view">
+        <field name="name">stock.picking.iot.graph</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <graph type="bar" sample="1">
+                <field name="create_date" interval="day"/>
+                <field name="iot_net_weight" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_picking_iot_pivot" model="ir.ui.view">
+        <field name="name">stock.picking.iot.pivot</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <pivot sample="1">
+                <field name="create_date" interval="day" type="row"/>
+                <field name="picking_type_id" type="col"/>
+                <field name="iot_net_weight" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_picking_iot_search" model="ir.ui.view">
+        <field name="name">stock.picking.iot.search</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <filter name="today" string="Hari Ini"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="last_7" string="7 Hari Terakhir"
+                        domain="[('create_date', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                <filter name="this_month" string="Bulan Ini"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-01'))]"/>
+                <filter name="this_year" string="Tahun Ini"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-01-01'))]"/>
+                <separator/>
+                <filter name="state_done" string="Selesai" domain="[('state', '=', 'done')]"/>
+                <filter name="state_open" string="Belum Selesai"
+                        domain="[('state', 'not in', ('done', 'cancel'))]"/>
+                <group>
+                    <filter name="group_day" string="Tanggal"
+                            context="{'group_by': 'create_date:day'}"/>
+                    <filter name="group_type" string="Tipe Operasi"
+                            context="{'group_by': 'picking_type_id'}"/>
+                    <filter name="group_partner" string="Partner"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_state" string="Status"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_iot_weighing_dashboard" model="ir.actions.act_window">
+        <field name="name">Dashboard Penimbangan</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">graph,pivot,list,form</field>
+        <field name="search_view_id" ref="view_picking_iot_search"/>
+        <field name="domain">[('iot_net_weight', '&gt;', 0)]</field>
+        <field name="context">{'search_default_group_day': 1}</field>
+    </record>
+
+    <menuitem id="menu_iot_weighing_dashboard"
+              name="Dashboard Penimbangan"
+              parent="menu_forgetrack_root"
+              action="action_iot_weighing_dashboard"
+              sequence="5"/>
+</odoo>
