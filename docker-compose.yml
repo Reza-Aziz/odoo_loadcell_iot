@@ -31,22 +31,23 @@ services:
       - ./addons:/mnt/extra-addons
     tty: true
 
-  mosquitto:
-    image: eclipse-mosquitto:2
+  mqtt-subscriber:
+    build: ./mqtt
     restart: unless-stopped
-    ports:
-      - "8883:8883"
-    volumes:
-      - ./mosquitto/config:/mosquitto/config
-      - ./mosquitto/certs:/mosquitto/certs
-      - mqtt-data:/mosquitto/data
-    healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub --cafile /mosquitto/certs/server.crt -h localhost -p 8883 -u iot_user -P iot_pass -t '$$SYS/broker/version' -C 1 -W 3 > /dev/null"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    depends_on:
+      - odoo
+    environment:
+      MQTT_HOST: ${MQTT_HOST:-}
+      MQTT_PORT: ${MQTT_PORT:-8883}
+      MQTT_TLS: ${MQTT_TLS:-true}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_TOPIC: factory/plant_1/line_1/scale_weight
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: odoo
+      ODOO_USER: admin
+      ODOO_PASSWORD: admin
 
 volumes:
   db-data:
   odoo-data:
-  mqtt-data:

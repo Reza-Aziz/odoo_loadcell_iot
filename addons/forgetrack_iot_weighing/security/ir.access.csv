@@ -1,0 +1,2 @@
+id,name,model_id,group_id/id,operation,domain
+access_iot_scale_reading_user,iot.scale.reading user,iot.scale.reading,base.group_user,crud,

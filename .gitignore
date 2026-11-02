@@ -1,7 +1,4 @@
-# --- secrets & generated files ---
-mosquitto/config/passwd
-mosquitto/certs/
-*.key
+# --- secrets ---
 .env
 
 # --- python ---

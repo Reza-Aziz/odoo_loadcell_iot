@@ -13,14 +13,20 @@ class StockPicking(models.Model):
     )
 
     def action_get_iot_weight(self):
-        """Salin iot_net_weight ke quantity detail move."""
+        """Ambil pembacaan timbangan terakhir (dari MQTT) dan isi quantity move."""
+        reading = self.env['iot.scale.reading'].search([], limit=1)
         for picking in self:
-            if picking.iot_net_weight <= 0:
-                continue
-            moves = picking.move_ids
+            weight = reading.weight if reading else picking.iot_net_weight
+            if weight <= 0:
+                raise UserError(
+                    "Belum ada data timbangan. Pastikan subscriber MQTT jalan dan "
+                    "sudah ada pesan di topic factory/plant_1/line_1/scale_weight."
+                )
             # ponytail: asumsi 1 baris produk per receipt; perlu logika
             # pembagian kalau nanti receipt multi-produk.
+            moves = picking.move_ids
             if len(moves) != 1:
                 raise UserError("Isi berat IoT hanya untuk receipt dengan 1 baris produk.")
-            moves.quantity = picking.iot_net_weight
+            picking.iot_net_weight = weight
+            moves.quantity = weight
         return True

@@ -12,6 +12,7 @@
         'account',
     ],
     'data': [
+        'security/ir.access.csv',
         'views/stock_picking_views.xml',
     ],
     'installable': True,
